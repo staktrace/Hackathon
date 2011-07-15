@@ -1,0 +1,223 @@
+<!DOCTYPE HTML>
+<html lang="en">
+    <head>
+        <title>Hackathon - template.html</title>
+        <script type="text/javascript" src="js/Three.js"></script>
+        <script type="text/javascript" src="js/RequestAnimationFrame.js"></script>
+        <script type="text/javascript">
+
+cloudYMin = 200;
+cloudYMax = 225;
+cloudSizeMin = 25;
+cloudSizeMax = 37
+
+function rand(lower, upper) {
+    return Math.floor(lower + Math.random() * (upper - lower));
+}
+
+function cloudColor() {
+    var color = rand(0x80, 0xA0);
+    color = (color << 16) + (color << 8) + color;
+    return color;
+}
+
+function makeCloud(x) {
+    var y = rand(cloudYMin, cloudYMax);
+    //c = new THREE.Mesh(new THREE.SphereGeometry(rand(400, 500), rand(10, 20), rand(10, 20)),
+    var dx = rand(cloudSizeMin, cloudSizeMax);
+    var clr = cloudColor();
+    var c = new THREE.Mesh(new THREE.SphereGeometry(dx, rand(10, 20), rand(10, 20)),
+                       new THREE.MeshLambertMaterial( { color: clr } ));
+    c.position.set(x, y, 0);
+    x = 0;
+    for (var i = rand(2, 4); i >= 0; i--) {
+        x += dx;
+        dx = rand(cloudSizeMin, cloudSizeMax);
+        var c2 = new THREE.Mesh(new THREE.SphereGeometry(dx, rand(10, 20), rand(10, 20)),
+                           new THREE.MeshLambertMaterial( { color: clr } ));
+        c2.position.set(x, 0, 0);
+        c.addChild(c2);
+    }
+    
+    return c;
+}
+
+function init(element, width, height) {
+    // Create a three.js camera to view our codez
+    camera = new THREE.Camera,
+    camera.projectionMatrix = THREE.Matrix4.makeOrtho(0, width, 0, height, 5000000, -500000);
+    camera.position.z = 10;
+    //camera = new THREE.Camera(90, width / height, 1, 10000);
+    //camera.position.z = 1500;
+
+    // Create a new scene to show our pretty (soon-to-be) sprites
+    scene = new THREE.Scene();
+
+    ufo = new THREE.Sprite({
+        map: "assets/ufo.png"
+    });
+    ufo.position.set(50, 100, 0);
+    scene.addChild(ufo);
+
+    person = new THREE.Sprite({
+        map: "assets/person.png"
+    });
+    person.position.set(rand(200, 800), height - 50, 0);
+    scene.addChild(person);
+
+    cylinder = new THREE.Mesh(new THREE.CylinderGeometry(20, 10, 80, height - 80, 0, 0),
+                              new THREE.MeshLambertMaterial( { color: 0x80FFFFFF } ));
+    cylinder.rotation.set(-Math.PI / 2, 0, 0);
+    cylinder.position.set(0, height/2, 80);
+    ufo.addChild(cylinder);
+
+    clouds = new Array();
+    for (var i = 0; i < 10; i++) {
+        var x = rand(0, 2000);
+        clouds[i] = new Object();
+        clouds[i].speed = rand(2, 5);
+        clouds[i].img = makeCloud(x);
+        scene.addChild(clouds[i].img);
+    }
+
+    var earthradius = 10000000;
+    var earth = new THREE.Mesh(new THREE.SphereGeometry(earthradius, 100, 100),
+                               new THREE.MeshLambertMaterial( { color: 0x208000 } ));
+    earth.position.set(width / 2, earthradius + height - 50, 0);
+    scene.addChild(earth);
+
+    var pointLight = new THREE.PointLight(0xFFFFFF);
+    pointLight.position.set(1000, 0, 0);
+    scene.addChild(pointLight);
+
+    scene.addChild(new THREE.AmbientLight(0x808080));
+
+    // Set up the three.js renderer
+    renderer = new THREE.WebGLRenderer();
+    renderer.setClearColorHex(0x404080, 1);
+    renderer.setSize(width, height);
+    renderer.setViewport(0, 0, 1000, 600);
+    element.appendChild(renderer.domElement);
+}
+
+frameCount = 100;
+
+// This function causes the renderer to actually render each frame
+function animate() {
+    // Use this browser supported API to get rendering timings
+    //if (frameCount-- > 0) {
+        requestAnimationFrame(animate);
+    //}
+    animate_clouds();
+    animate_person();
+    render();
+}
+
+function animate_clouds() {
+    for (var i = 0; i < clouds.length; i++) {
+        var img = clouds[i].img;
+        var x = img.position.x - clouds[i].speed;
+        if (x < -500) {
+            x += 3000;
+        }
+        img.position.set(x, img.position.y, img.position.z);
+    }
+}
+
+person_dir = 1;
+person_strength = 20;
+
+function animate_person() {
+    if (person_strength-- <= 0) {
+        person_dir = rand(0, 2);
+        if (person_dir == 0) {
+            person_dir = -1;
+        }
+        person_strength = rand(10, 100);
+    }
+    person.position.set(person.position.x + person_dir, person.position.y, person.position.z);
+}
+
+// Render our scene
+function render() {
+    renderer.render(scene, camera);
+}
+
+// Called on <body> load
+function start() {
+    var container = document.getElementById("container");
+    init(container, 1000, 600);
+    animate();
+
+    // Set up key down listener
+    document.addEventListener("keydown", onDocumentKeyDown, true);
+}
+
+personOnScreen = 1;
+started = 0;
+
+function onDocumentKeyDown(event) {
+    switch (event.keyCode) {
+        case 32:
+            if (started == 1 && personOnScreen && Math.abs(person.position.x - ufo.position.x) < 40) {
+                scene.removeChild(person);
+                personOnScreen = 0;
+                document.getElementById('score').innerHTML = parseInt(document.getElementById('score').innerHTML) + 1;
+                setTimeout(function() {
+                    person.position.set(rand(200, 800), 550, 0);
+                    scene.addChild(person);
+                    personOnScreen = 1;
+                }, 1000);
+            }
+            break;
+        case 37:
+            ufo.position.set(ufo.position.x - 10, ufo.position.y, ufo.position.z);
+            startPlaying();
+            break;
+        case 39: 
+            ufo.position.set(ufo.position.x + 10, ufo.position.y, ufo.position.z);
+            startPlaying();
+            break;
+        //case 38: 
+        //    ufo.position.set(ufo.position.x, ufo.position.y - 10, ufo.position.z);
+        //    break;
+        //case 40: 
+        //    ufo.position.set(ufo.position.x, ufo.position.y + 10, ufo.position.z);
+        //    break;
+        default:
+            return;
+    }
+    //animate_clouds();
+    //animate_person();
+    //requestAnimationFrame(animate);
+}
+
+function startPlaying() {
+    if (started) {
+        return;
+    }
+    document.getElementById('score').innerHTML = 0;
+    document.getElementById('time').innerHTML = 30;
+    started = 1;
+    timer = setInterval(decTimer, 1000);
+}
+
+function decTimer() {
+    var time = parseInt(document.getElementById('time').innerHTML) - 1;
+    if (time == 0) {
+        started = 0;
+        clearInterval(timer);
+    }
+    document.getElementById('time').innerHTML = time;
+}
+
+        </script>
+    </head>
+
+    <body onload="start()">
+        <div id="container">
+        </div>
+        Score: <span id="score">0</span><br/>
+        Time Remaining: <span id="time">30</span><br/>
+    </body>
+</html>
